@@ -51,10 +51,18 @@ let yaw = 0;
 let rafId = 0;
 let last = 0;
 const demoPrev = { x: 0, y: 0, ok: false };
+const timings = {};
+let loadText = '';
+let chipText = '';
+let chipCheck = 0;
+// Every mutable module variable is declared above this line. Code below runs
+// during module evaluation (URL switches, the capability error path), so a `let`
+// declared further down would still be in its temporal dead zone when called.
+// That crash shipped twice (demo autostart, then the no-WebGL path).
 
 const stats = { ps, effects, expr, hud, renderer, get tracker() { return tracker; }, get tier() { return tier; }, get dpr() { return dpr; }, get yaw() { return yaw; } };
 // Read-only handles for the stats overlay and automated tests.
-window.__app = { stats, snapshot: hud.snapshot, CONFIG, ps, expr, effects, demo, collider, get mode() { return mode; } };
+window.__app = { stats, snapshot: hud.snapshot, timings, CONFIG, ps, expr, effects, demo, collider, get mode() { return mode; } };
 
 applyTier(tierIx);
 const gov = new Governor(CONFIG.governor, tierIx, maxTier());
@@ -82,7 +90,6 @@ function checkCapabilities() {
   return null;
 }
 
-const timings = (window.__app.timings = {});
 function loadTracker() {
   const p = (async () => {
     const t0 = performance.now();
@@ -106,7 +113,6 @@ function loadTracker() {
   return p;
 }
 
-let loadText = '';
 function setProgress(f, text) {
   loadText = text;
   $('#bar').style.transform = `scaleX(${f})`;
@@ -119,6 +125,9 @@ $('#btn-demo').addEventListener('click', startDemo);
 $('#btn-retry').addEventListener('click', startCamera);
 $('#btn-err-demo').addEventListener('click', startDemo);
 $('#btn-hud').addEventListener('click', () => hud.setVisible(!hud.visible));
+// Handlers are attached: the buttons may work now (they ship disabled in the HTML).
+$('#btn-demo').disabled = false;
+$('#btn-start').disabled = !!capErr;
 
 async function startCamera() {
   stopDemo();
@@ -359,8 +368,6 @@ function maxTier() {
 }
 
 // ---------------------------------------------------------------- status chip
-let chipText = '';
-let chipCheck = 0;
 function updateChip(now) {
   if (now - chipCheck < 200) return;
   chipCheck = now;

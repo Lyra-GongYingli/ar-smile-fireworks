@@ -4,8 +4,9 @@
 
 A browser AR prototype for a LIVE room: smile and it rains, laugh and fireworks burst above your head; the sparks bounce off your head. Everything runs on-device.
 
-- **Live demo**: _(published link goes here)_
-- 没有摄像头可以打开演示模式：在链接后加 `?demo=1`（可拖动头像，按住按钮或键盘 S / L 模拟微笑、大笑）
+- **Live demo**：<https://lyra-gongyingli.github.io/ar-smile-fireworks/>（手机或电脑浏览器打开，允许摄像头）
+- **没有摄像头**：<https://lyra-gongyingli.github.io/ar-smile-fireworks/?demo=1> 演示模式，可拖动头像，按住按钮或键盘 S / L 模拟微笑、大笑
+- **性能面板**：点右下角「性能」，或加 `?hud=1`，会显示帧率、推理耗时、检测频率和头部碰撞体轮廓
 
 ![演示模式：大笑时烟花在头顶炸开，火花落在头上滑落](docs/demo.jpg)
 
@@ -65,7 +66,7 @@ PM 的需求只有一句话，原型先把它翻译成可验收的规则。分�
 | 画面里没有人脸 | 60 | 0.4–1 ms | 7 ms | 4–8 次/秒（待机） |
 | 演示模式，约 3000 个粒子 | 60 | 0.5 ms（Canvas 2D 回退 1.2 ms） | — | — |
 
-首次加载 18.9 MB（wasm 14.6 MB + 模型 3.8 MB + 脚本 0.6 MB），gzip 后约 7.6 MB；模型和 wasm 与页面同源托管，不依赖海外 CDN。
+首次加载原始体积 18.9 MB（wasm 14.6 MB + 模型 3.8 MB + 脚本 0.6 MB），GitHub Pages 会 gzip，实测传输 7.7 MB；10 分钟缓存内再次打开约 0.3 秒就绪。模型和 wasm 与页面同源托管，不依赖海外 CDN。
 
 ## 边缘情况
 

@@ -22,12 +22,21 @@
         var forced = /[?&]caps=(\w+)/.exec(location.search); // QA: ?caps=gl simulates a missing capability
         if (forced && forced[1] in caps) caps[forced[1]] = false;
         if (!caps.wasm || !caps.simd || !caps.gl) return;
-        ['vendor/mediapipe/wasm/vision_wasm_internal.wasm', 'models/face_landmarker.task'].forEach(function (href) {
+        // Big files at low priority so the 30 kB of app modules are not stuck
+        // behind 7.7 MB on the same connection (measured: UI blank ~2 s on a slow
+        // link). The loader script is preloaded too: MediaPipe only requests it
+        // after both downloads finish, which cost one more serial round trip.
+        [
+          ['vendor/mediapipe/wasm/vision_wasm_internal.wasm', 'fetch'],
+          ['models/face_landmarker.task', 'fetch'],
+          ['vendor/mediapipe/wasm/vision_wasm_internal.js', 'script'],
+        ].forEach(function (r) {
           var l = document.createElement('link');
           l.rel = 'preload';
-          l.as = 'fetch';
+          l.as = r[1];
           l.crossOrigin = 'anonymous';
-          l.href = href;
+          l.href = r[0];
+          if (r[1] === 'fetch') l.fetchPriority = 'low';
           document.head.appendChild(l);
         });
       })();
@@ -54,30 +63,33 @@
 
     <div id="status" class="chip" role="status" hidden></div>
 
+    <!-- Text is in the HTML so the first paint is readable before any script
+         arrives; i18n.js swaps it to English when needed. Buttons stay disabled
+         until main.js has attached their handlers. -->
     <section id="intro" class="panel">
-      <h1 data-t="title"></h1>
-      <p class="lead" data-t="lead"></p>
+      <h1 data-t="title">笑一笑，下场雨；笑出声，放烟花</h1>
+      <p class="lead" data-t="lead">微笑时屏幕下雨，大笑时烟花在头顶炸开，火花落到头上会弹开。晃头可以把火花甩走。</p>
       <div class="progress" aria-hidden="true"><div id="bar"></div></div>
-      <p id="load-text" class="muted small"></p>
-      <button id="btn-start" class="btn primary" data-t="start"></button>
-      <button id="btn-demo" class="btn ghost" data-t="demo"></button>
-      <p class="muted small" data-t="privacy"></p>
+      <p id="load-text" class="muted small">正在加载…</p>
+      <button id="btn-start" class="btn primary" data-t="start" disabled>开启摄像头</button>
+      <button id="btn-demo" class="btn ghost" data-t="demo" disabled>没有摄像头？看演示</button>
+      <p class="muted small" data-t="privacy">画面只在你的设备上计算，不会上传。</p>
       <p id="inapp" class="warn small" data-t="inApp" hidden></p>
     </section>
 
     <section id="error" class="panel" hidden>
       <p id="err-text"></p>
-      <button id="btn-retry" class="btn primary" data-t="retry"></button>
-      <button id="btn-err-demo" class="btn ghost" data-t="demo"></button>
+      <button id="btn-retry" class="btn primary" data-t="retry">重试</button>
+      <button id="btn-err-demo" class="btn ghost" data-t="demo">没有摄像头？看演示</button>
     </section>
 
     <div id="demo-pad">
-      <button class="btn hold" data-hold="smile" data-t="holdSmile"></button>
-      <button class="btn hold" data-hold="laugh" data-t="holdLaugh"></button>
+      <button class="btn hold" data-hold="smile" data-t="holdSmile">按住：微笑</button>
+      <button class="btn hold" data-hold="laugh" data-t="holdLaugh">按住：大笑</button>
     </div>
 
     <div id="controls">
-      <button id="btn-hud" class="btn tiny" data-t="hud"></button>
+      <button id="btn-hud" class="btn tiny" data-t="hud">性能</button>
     </div>
 
     <div id="hud" hidden>
