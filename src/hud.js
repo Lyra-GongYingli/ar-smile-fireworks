@@ -117,7 +117,7 @@ export class Hud {
  * One line a tester can paste back from a phone: medians and tails over the
  * seconds a face was tracked, tier changes over time, and what the device is.
  */
-export function perfReport(samples, snap, view) {
+export function perfReport(samples, snap, view, sources) {
   const face = samples.filter((x) => x.face && !x.idle);
   const q = (k, p) => quantile(face.map((x) => x[k]), p);
   const f0 = (v) => (Number.isNaN(v) ? '-' : v.toFixed(0));
@@ -139,6 +139,7 @@ export function perfReport(samples, snap, view) {
     `tier ${tiers}`,
     `${snap.renderer}@${snap.dpr.toFixed(2)}x ${view}`,
     `${os} ${browser}`,
+    sources ? `src ${Object.entries(sources).map(([k, h]) => `${k}:${h}`).join(' ')}` : 'src -',
   ].join(' | ');
 }
 

@@ -3,54 +3,57 @@
 // inference under a share of main-thread time.
 
 import { FaceLandmarker } from '../vendor/mediapipe/vision_bundle.mjs';
+import { ASSETS } from './assets.js';
 
 const ROOT = new URL('../', import.meta.url);
 const WASM_LOADER = new URL('vendor/mediapipe/wasm/vision_wasm_internal.js', ROOT).href;
 const WASM_BINARY = new URL('vendor/mediapipe/wasm/vision_wasm_internal.wasm', ROOT).href;
 const MODEL = new URL('models/face_landmarker.task', ROOT).href;
 
-// Uncompressed sizes of the vendored files. Used as the progress denominator
-// because Content-Length is the *compressed* size when the host gzips.
-const EXPECTED = { wasm: 14603354, model: 3758596 };
+// Own-host URL of each pinned asset: the fallback when a mirror's bytes fail the check.
+const SELF = {
+  wasm: WASM_BINARY,
+  loader: WASM_LOADER,
+  model: MODEL,
+};
 
-async function fetchBytes(url, expected, onBytes) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  if (!res.body || !res.body.getReader) {
-    const buf = new Uint8Array(await res.arrayBuffer());
-    onBytes(buf.length);
-    return buf;
-  }
-  const reader = res.body.getReader();
-  const chunks = [];
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    got += value.length;
-    onBytes(Math.min(got, expected));
-  }
-  const out = new Uint8Array(got);
-  let o = 0;
-  for (const c of chunks) {
-    out.set(c, o);
-    o += c.length;
-  }
-  return out;
+async function sha256Hex(bytes) {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  let h = '';
+  for (const b of d) h += b.toString(16).padStart(2, '0');
+  return h;
 }
 
-/** Download wasm + model in parallel, reporting combined progress 0..1. */
+/**
+ * Wait for the downloads src/download.js started from the page, report
+ * combined progress 0..1, and verify every file. A file from a mirror that
+ * fails the check is fetched again from the page's own host.
+ */
 export async function preloadAssets(onProgress) {
-  const got = { wasm: 0, model: 0 };
-  const total = EXPECTED.wasm + EXPECTED.model;
-  const report = () => onProgress(Math.min(0.99, (got.wasm + got.model) / total));
-  const [wasm, model] = await Promise.all([
-    fetchBytes(WASM_BINARY, EXPECTED.wasm, (n) => ((got.wasm = n), report())),
-    fetchBytes(MODEL, EXPECTED.model, (n) => ((got.model = n), report())),
-  ]);
-  onProgress(1);
-  return { wasm, model };
+  let dl = window.__downloads;
+  if (!dl && window.__createDownloads) dl = window.__createDownloads(fetch.bind(window), () => Date.now()).start();
+  if (!dl) throw new Error('downloader script missing');
+  dl.onProgress = () => {
+    const got = dl.got.wasm + dl.got.loader + dl.got.model;
+    onProgress(Math.min(0.99, got / dl.total), dl.retries);
+  };
+  dl.onProgress();
+
+  const out = { sources: {} };
+  await Promise.all(
+    Object.keys(ASSETS).map(async (key) => {
+      let r = await dl.promises[key];
+      if ((await sha256Hex(r.bytes)) !== ASSETS[key].sha256) {
+        console.warn(`${key}: checksum mismatch from ${r.url}, refetching from own host`);
+        r = await dl.fetch(key, [SELF[key]]);
+        if ((await sha256Hex(r.bytes)) !== ASSETS[key].sha256) throw new Error(`${key}: checksum mismatch`);
+      }
+      out[key] = r.bytes;
+      out.sources[key] = new URL(r.url, location.href).host;
+    }),
+  );
+  onProgress(1, dl.retries);
+  return out;
 }
 
 export class FaceTracker {
@@ -74,11 +77,18 @@ export class FaceTracker {
 
   /** Create the landmarker, GPU first, CPU if the GPU path fails. */
   async init(assets, preferCPU = false) {
-    let binaryUrl = WASM_BINARY;
-    if (assets && assets.wasm) {
-      binaryUrl = URL.createObjectURL(new Blob([assets.wasm], { type: 'application/wasm' }));
-    }
-    const fileset = { wasmLoaderPath: WASM_LOADER, wasmBinaryPath: binaryUrl };
+    // Verified bytes are handed to MediaPipe as blob URLs, so nothing is
+    // downloaded twice and nothing unverified runs.
+    const blobs = [];
+    const asBlob = (bytes, type) => {
+      const u = URL.createObjectURL(new Blob([bytes], { type }));
+      blobs.push(u);
+      return u;
+    };
+    const fileset = {
+      wasmLoaderPath: assets && assets.loader ? asBlob(assets.loader, 'text/javascript') : WASM_LOADER,
+      wasmBinaryPath: assets && assets.wasm ? asBlob(assets.wasm, 'application/wasm') : WASM_BINARY,
+    };
     const model = assets && assets.model;
     const order = preferCPU ? ['CPU'] : ['GPU', 'CPU'];
     let lastErr = null;
@@ -109,7 +119,7 @@ export class FaceTracker {
         console.warn(`FaceLandmarker ${delegate} init failed`, e);
       }
     }
-    if (binaryUrl !== WASM_BINARY) URL.revokeObjectURL(binaryUrl);
+    for (const u of blobs) URL.revokeObjectURL(u);
     if (!this.landmarker) throw lastErr || new Error('FaceLandmarker init failed');
   }
 

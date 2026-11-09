@@ -97,8 +97,9 @@ function checkCapabilities() {
 function loadTracker() {
   const p = (async () => {
     const t0 = performance.now();
-    const assets = params.get('noblob') === '1' ? null : await preloadAssets((f) => setProgress(f, T.loading(f)));
+    const assets = params.get('noblob') === '1' ? null : await preloadAssets((f, retries) => setProgress(f, retries ? T.loadingRetry(f) : T.loading(f)));
     timings.downloadMs = performance.now() - t0;
+    if (assets) timings.sources = assets.sources;
     setProgress(1, T.preparing);
     const t = new FaceTracker(CONFIG.detect);
     await t.init(assets, params.get('cpu') === '1');
@@ -134,7 +135,7 @@ $('#btn-hud').addEventListener('click', () => {
 });
 // Phone testing: a one-line report the tester can copy back (numbers and device type only).
 $('#btn-report').addEventListener('click', () => {
-  $('#report-text').textContent = perfReport(hud.samples, hud.snapshot, `${Math.round(W)}x${Math.round(H)}`);
+  $('#report-text').textContent = perfReport(hud.samples, hud.snapshot, `${Math.round(W)}x${Math.round(H)}`, timings.sources);
   $('#report').hidden = false;
 });
 $('#btn-report-close').addEventListener('click', () => ($('#report').hidden = true));
@@ -152,6 +153,16 @@ $('#btn-calib-again').addEventListener('click', () => {
   calibKey = '';
   $('#calib-result').hidden = true;
   $('#calib-actions').hidden = true;
+});
+// Saves the numbers to a file (desktop: lands in Downloads), for analysis offline.
+$('#btn-calib-download').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(window.__calib)], { type: 'application/json' }));
+  a.download = `calib-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 });
 $('#btn-calib-copy').addEventListener('click', async () => {
   try {

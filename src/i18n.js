@@ -5,6 +5,7 @@ const ZH = {
   demo: '没有摄像头？看演示',
   privacy: '画面只在你的设备上计算，不会上传。',
   loading: (p) => `正在加载人脸模型 ${Math.round(p * 100)}%`,
+  loadingRetry: (p) => `网络较慢，已换线路重试 ${Math.round(p * 100)}%`,
   preparing: '正在准备推理引擎…',
   ready: '模型已就绪',
   opening: '正在打开摄像头…',
@@ -28,6 +29,7 @@ const ZH = {
   calibDone: '校准完成，结果如下',
   calibAgain: '再测一次',
   calibCopy: '复制数据',
+  calibDownload: '下载数据',
   calibCopied: '已复制',
   calibCopyFailed: '复制失败',
   err: {
@@ -53,6 +55,7 @@ const EN = {
   demo: 'No camera? Watch the demo',
   privacy: 'Video is processed on your device and never uploaded.',
   loading: (p) => `Loading face model ${Math.round(p * 100)}%`,
+  loadingRetry: (p) => `Slow network, retrying ${Math.round(p * 100)}%`,
   preparing: 'Preparing the inference engine…',
   ready: 'Model ready',
   opening: 'Opening camera…',
@@ -76,6 +79,7 @@ const EN = {
   calibDone: 'Calibration done',
   calibAgain: 'Run again',
   calibCopy: 'Copy data',
+  calibDownload: 'Download data',
   calibCopied: 'Copied',
   calibCopyFailed: 'Copy failed',
   err: {

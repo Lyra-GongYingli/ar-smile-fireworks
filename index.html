@@ -10,8 +10,8 @@
     <script>
       // Capability check before any download. The tracker needs Wasm SIMD
       // (MediaPipe 1.2 ships no fallback build) and WebGL (even its CPU path
-      // converts frames through WebGL). Only capable devices start the ~18 MB
-      // preload; the rest go straight to the demo without paying for it.
+      // converts frames through WebGL). Incapable devices never start the
+      // ~18 MB download; they go straight to the demo.
       (function () {
         var wasm = typeof WebAssembly === 'object';
         var simd = wasm && WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]));
@@ -21,24 +21,7 @@
         var caps = (window.__caps = { wasm: wasm, simd: simd, gl: !!g });
         var forced = /[?&]caps=(\w+)/.exec(location.search); // QA: ?caps=gl simulates a missing capability
         if (forced && forced[1] in caps) caps[forced[1]] = false;
-        if (!caps.wasm || !caps.simd || !caps.gl) return;
-        // Big files at low priority so the 30 kB of app modules are not stuck
-        // behind 7.7 MB on the same connection (measured: UI blank ~2 s on a slow
-        // link). The loader script is preloaded too: MediaPipe only requests it
-        // after both downloads finish, which cost one more serial round trip.
-        [
-          ['vendor/mediapipe/wasm/vision_wasm_internal.wasm', 'fetch'],
-          ['models/face_landmarker.task', 'fetch'],
-          ['vendor/mediapipe/wasm/vision_wasm_internal.js', 'script'],
-        ].forEach(function (r) {
-          var l = document.createElement('link');
-          l.rel = 'preload';
-          l.as = r[1];
-          l.crossOrigin = 'anonymous';
-          l.href = r[0];
-          if (r[1] === 'fetch') l.fetchPriority = 'low';
-          document.head.appendChild(l);
-        });
+        // Capable devices: src/download.js (end of <body>) starts the downloads.
       })();
     </script>
     <link rel="modulepreload" href="vendor/mediapipe/vision_bundle.mjs" />
@@ -92,6 +75,7 @@
       <div id="calib-actions" hidden>
         <button id="btn-calib-again" class="btn ghost" data-t="calibAgain">再测一次</button>
         <button id="btn-calib-copy" class="btn ghost" data-t="calibCopy">复制数据</button>
+        <button id="btn-calib-download" class="btn ghost" data-t="calibDownload">下载数据</button>
       </div>
     </section>
 
@@ -123,6 +107,7 @@
       <div class="meter"><span>jaw</span><div class="track"><div class="fill" data-bar="jaw"></div><i data-mark="jaw"></i></div></div>
     </div>
 
+    <script src="src/download.js"></script>
     <script type="module" src="src/main.js"></script>
   </body>
 </html>
