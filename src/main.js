@@ -6,7 +6,7 @@ import { ParticleSystem } from './particles.js';
 import { Effects } from './effects.js';
 import { GLRenderer } from './renderer-gl.js';
 import { Canvas2DRenderer } from './renderer-2d.js';
-import { Hud } from './hud.js';
+import { Hud, perfReport } from './hud.js';
 import { DemoInput } from './demo.js';
 import { Governor } from './governor.js';
 import { Calibration, PHASES, PHASE_LABEL } from './calibrate.js';
@@ -64,7 +64,7 @@ let calibKey = '';
 // declared further down would still be in its temporal dead zone when called.
 // That crash shipped twice (demo autostart, then the no-WebGL path).
 
-const stats = { ps, effects, expr, hud, renderer, get tracker() { return tracker; }, get tier() { return tier; }, get dpr() { return dpr; }, get yaw() { return yaw; } };
+const stats = { ps, effects, expr, hud, renderer, get tracker() { return tracker; }, get tier() { return tier; }, get dpr() { return dpr; }, get yaw() { return yaw; }, get mode() { return mode; }, get facePresent() { return head.present; } };
 // Read-only handles for the stats overlay and automated tests.
 window.__app = { stats, snapshot: hud.snapshot, timings, CONFIG, ps, expr, effects, demo, collider, get mode() { return mode; } };
 
@@ -128,7 +128,24 @@ $('#btn-start').addEventListener('click', startCamera);
 $('#btn-demo').addEventListener('click', startDemo);
 $('#btn-retry').addEventListener('click', startCamera);
 $('#btn-err-demo').addEventListener('click', startDemo);
-$('#btn-hud').addEventListener('click', () => hud.setVisible(!hud.visible));
+$('#btn-hud').addEventListener('click', () => {
+  hud.setVisible(!hud.visible);
+  $('#btn-report').hidden = !hud.visible;
+});
+// Phone testing: a one-line report the tester can copy back (numbers and device type only).
+$('#btn-report').addEventListener('click', () => {
+  $('#report-text').textContent = perfReport(hud.samples, hud.snapshot, `${Math.round(W)}x${Math.round(H)}`);
+  $('#report').hidden = false;
+});
+$('#btn-report-close').addEventListener('click', () => ($('#report').hidden = true));
+$('#btn-report-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#report-text').textContent);
+    $('#btn-report-copy').textContent = T.calibCopied;
+  } catch {
+    $('#btn-report-copy').textContent = T.calibCopyFailed;
+  }
+});
 $('#btn-calib-again').addEventListener('click', () => {
   calib.reset();
   calibFaceSince = -1;
@@ -507,7 +524,10 @@ window.addEventListener('keyup', (e) => {
 });
 
 // URL switches run last, after every module-level `let` above is initialised.
-if (params.get('hud') === '1') hud.setVisible(true);
+if (params.get('hud') === '1') {
+  hud.setVisible(true);
+  $('#btn-report').hidden = false;
+}
 if (params.get('demo') === '1') startDemo();
 else if (testSrc && params.get('autostart') === '1') startCamera();
 

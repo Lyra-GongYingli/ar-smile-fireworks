@@ -1,6 +1,9 @@
 // Stats overlay. Collects numbers every frame, touches the DOM 4x per second.
 
 import { EXPR_NAME } from './expression.js';
+import { quantile } from './calibrate.js';
+
+const MAX_SAMPLES = 3600; // one per second: an hour of camera time
 
 export class Hud {
   constructor(root, cfg) {
@@ -16,6 +19,9 @@ export class Hud {
     this.lastHits = 0;
     this.lastBursts = 0;
     this.snapshot = {};
+    this.samples = []; // per-second camera-mode samples for the copyable report
+    this.lastSampleAt = 0;
+    this.startedAt = 0;
     this.lines = {};
     for (const el of root.querySelectorAll('[data-k]')) this.lines[el.dataset.k] = el;
     this.bars = {
@@ -68,6 +74,23 @@ export class Hud {
     snap.dpr = s.dpr;
     snap.idle = s.tracker ? s.tracker.idle : false;
 
+    if (s.mode === 'camera' && s.tracker && nowMs - this.lastSampleAt >= 1000) {
+      if (!this.startedAt) this.startedAt = nowMs;
+      this.lastSampleAt = nowMs;
+      if (this.samples.length < MAX_SAMPLES) {
+        this.samples.push({
+          t: (nowMs - this.startedAt) / 1000,
+          fps,
+          work: snap.workMs,
+          infer: snap.inferMs,
+          det: detHz,
+          tier: snap.tier,
+          face: s.facePresent,
+          idle: snap.idle,
+        });
+      }
+    }
+
     this.lastRuns = s.tracker ? s.tracker.runs : 0;
     this.lastHits = s.ps.hits;
     this.frames = 0;
@@ -88,6 +111,35 @@ export class Hud {
     if (this.bars.smile) this.bars.smile.style.width = `${(s.smile * 100).toFixed(0)}%`;
     if (this.bars.jaw) this.bars.jaw.style.width = `${(s.jaw * 100).toFixed(0)}%`;
   }
+}
+
+/**
+ * One line a tester can paste back from a phone: medians and tails over the
+ * seconds a face was tracked, tier changes over time, and what the device is.
+ */
+export function perfReport(samples, snap, view) {
+  const face = samples.filter((x) => x.face && !x.idle);
+  const q = (k, p) => quantile(face.map((x) => x[k]), p);
+  const f0 = (v) => (Number.isNaN(v) ? '-' : v.toFixed(0));
+  const f1 = (v) => (Number.isNaN(v) ? '-' : v.toFixed(1));
+  let tiers = samples.length ? samples[0].tier : snap.tier;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].tier !== samples[i - 1].tier) tiers += `→${samples[i].tier}@${Math.round(samples[i].t)}s`;
+  }
+  const ua = navigator.userAgent;
+  const os = (ua.match(/\(([^)]+)\)/) || [, ''])[1];
+  const browser = (ua.match(/(EdgA?|EdgiOS|CriOS|Chrome|FxiOS|Firefox|Version)\/[\d.]+/g) || []).pop() || '';
+  return [
+    `AR perf v1`,
+    `${samples.length}s, face ${face.length}s`, // one sample per second
+    `fps p50 ${f0(q('fps', 0.5))} p10 ${f0(q('fps', 0.1))}`,
+    `JS p50 ${f1(q('work', 0.5))} p90 ${f1(q('work', 0.9))} ms`,
+    `infer p50 ${f1(q('infer', 0.5))} p90 ${f1(q('infer', 0.9))} ms ${snap.delegate}`,
+    `detect p50 ${f0(q('det', 0.5))}/s`,
+    `tier ${tiers}`,
+    `${snap.renderer}@${snap.dpr.toFixed(2)}x ${view}`,
+    `${os} ${browser}`,
+  ].join(' | ');
 }
 
 function set(el, text) {

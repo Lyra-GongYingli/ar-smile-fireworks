@@ -295,6 +295,27 @@ body[data-mode='demo'] #demo-pad {
   margin: 0;
 }
 
+#report-text {
+  margin: 0 0 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#report-actions {
+  display: flex;
+  gap: 10px;
+}
+#report-actions .btn {
+  margin: 0;
+}
+#controls {
+  display: flex;
+  gap: 8px;
+}
+
 /* ---------- HUD ---------- */
 #hud {
   position: fixed;
