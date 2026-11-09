@@ -13,6 +13,12 @@
   box-sizing: border-box;
 }
 
+/* Author rules like `.btn { display: block }` beat the UA rule for [hidden];
+   without this, hidden buttons (retry on HTTPS errors, report) still showed. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
