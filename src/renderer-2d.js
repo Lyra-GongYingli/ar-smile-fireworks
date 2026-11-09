@@ -61,6 +61,11 @@ export class Canvas2DRenderer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
+    if (fx.dim > 0) {
+      ctx.globalAlpha = fx.dim * 0.75; // the GL pass dims the top more; one flat wash is enough here
+      ctx.fillStyle = 'rgb(0,0,0)';
+      ctx.fillRect(0, 0, w, h);
+    }
     const L = fx.light;
     if (L.i > 0) {
       ctx.globalAlpha = L.i * 0.8;

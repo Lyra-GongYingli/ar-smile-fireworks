@@ -1,6 +1,8 @@
 // WebGL point-sprite renderer. Every particle and sprite goes into one buffer
-// upload and one draw call per frame, however many there are. After a firework
-// a second, full-screen pass adds the burst's light to the scene.
+// upload per frame and two draw calls, however many there are: lights (sparks,
+// rain, drops) add up, so overlapping stars burn white; cloud puffs stack
+// normally, so the cloud keeps its shading. While fireworks run, one more
+// full-screen pass dims the picture and adds the bursts' light.
 
 import { KIND, HIDDEN } from './particles.js';
 import { SHAPE } from './sprites.js';
@@ -42,9 +44,12 @@ void main() {
   vec2 p = gl_PointCoord * 2.0 - 1.0;
   vec3 col = v_color.rgb;
   float a;
+  float sh = 0.0; // dark edge (premultiplied black): keeps water readable on a bright picture
   if (v_shape < 0.5) {
     float d2 = dot(p, p);
-    a = exp(-d2 * 5.0) + 0.6 * exp(-d2 * 40.0); // soft glow + hot core
+    float core = exp(-d2 * 40.0);
+    a = exp(-d2 * 5.0) + 0.6 * core; // soft glow + hot core
+    col = mix(col, vec3(1.0), 0.5 * core);
   } else if (v_shape < 1.5) {
     // streak: v_param CSS px wide, fading from a bright head to a clear tail
     vec2 q = p * v_half;
@@ -52,14 +57,18 @@ void main() {
     float across = abs(dot(q, vec2(-v_dir.y, v_dir.x)));
     float w = v_param * 0.5;
     float t = along / v_half * 0.5 + 0.5;
-    a = (1.0 - smoothstep(w, w + 0.8, across)) * smoothstep(0.0, 0.8, t) * (1.0 - smoothstep(0.9, 1.0, t));
+    float len = smoothstep(0.0, 0.8, t) * (1.0 - smoothstep(0.9, 1.0, t));
+    a = (1.0 - smoothstep(w, w + 0.8, across)) * len;
+    sh = (1.0 - smoothstep(w + 0.6, w + 2.0, across)) * len * 0.35;
   } else if (v_shape < 2.5) {
-    // comet: hot head at the centre, tail behind it
+    // comet: white-hot head at the centre, tail behind it
     vec2 q = p * v_half;
     float along = dot(q, v_dir);
     float across = dot(q, vec2(-v_dir.y, v_dir.x));
     float r2 = along * along + across * across;
-    float head = exp(-r2 / 3.0) + 0.45 * exp(-r2 / 18.0);
+    float hot = exp(-r2 / 3.0);
+    float head = hot + 0.45 * exp(-r2 / 18.0);
+    col = mix(col, vec3(1.0), 0.6 * hot);
     float t = clamp(1.0 + along / v_half, 0.0, 1.0) * step(along, 0.0);
     float tail = t * t * exp(-across * across / 1.6) * 0.7;
     // round window: a slow star has a small sprite, and its halo would show the square edge
@@ -78,6 +87,7 @@ void main() {
     float hl = exp(-dot(h, h) * 90.0);
     a = body * 0.35 + rim * 0.45 + hl;
     col = mix(col, vec3(1.0), clamp(hl, 0.0, 1.0));
+    sh = (1.0 - smoothstep(0.55, 0.8, d)) * 0.3;
   } else if (v_shape < 5.5) {
     // star: four-point glint
     vec2 r = vec2(dot(p, v_dir), dot(p, vec2(-v_dir.y, v_dir.x)));
@@ -89,12 +99,15 @@ void main() {
     vec2 r = vec2(dot(p, v_dir), dot(p, vec2(-v_dir.y, v_dir.x)) / v_param);
     float d = length(r);
     a = exp(-(d - 0.72) * (d - 0.72) * 90.0);
+    sh = exp(-(d - 0.72) * (d - 0.72) * 25.0) * 0.2;
   }
   a *= v_color.a;
-  gl_FragColor = vec4(col * a, a); // premultiplied
+  sh *= v_color.a;
+  gl_FragColor = vec4(col * a, a + sh * (1.0 - a)); // premultiplied
 }`;
 
-// Light wash: a full-screen triangle, brightest around the latest burst.
+// Scene pass: a full-screen triangle that dims the picture (most at the top,
+// the sky where shells break) and adds the bursts' light around the latest one.
 const LVS = `
 attribute vec2 a_xy;
 void main() { gl_Position = vec4(a_xy, 0.0, 1.0); }`;
@@ -104,10 +117,14 @@ uniform vec2 u_center; // device px, GL window coordinates (y up)
 uniform float u_radius;
 uniform vec3 u_color;
 uniform float u_i;
+uniform float u_dim;
+uniform float u_h;
 void main() {
   float d = distance(gl_FragCoord.xy, u_center) / u_radius;
   float f = u_i * (0.3 + 0.7 * exp(-d * d * 2.5));
-  gl_FragColor = vec4(u_color * f, f);
+  float k = u_dim * mix(0.45, 1.0, gl_FragCoord.y / u_h);
+  // over the video: darken by k, then tint towards the light by f
+  gl_FragColor = vec4(u_color * f, k + f - k * f);
 }`;
 
 const FLOATS = 6; // x, y, size, shape, angle, param
@@ -170,6 +187,8 @@ export class GLRenderer {
     this.uRadius = gl.getUniformLocation(this.lprog, 'u_radius');
     this.uColor = gl.getUniformLocation(this.lprog, 'u_color');
     this.uI = gl.getUniformLocation(this.lprog, 'u_i');
+    this.uDim = gl.getUniformLocation(this.lprog, 'u_dim');
+    this.uH = gl.getUniformLocation(this.lprog, 'u_h');
     this.lvbo = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lvbo);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
@@ -234,6 +253,10 @@ export class GLRenderer {
         a *= life * (0.55 + 0.45 * Math.sin(ps.seed[i] + ps.age[i] * 38));
       } else if (k === KIND.FLASH || k === KIND.TRAIL) {
         a *= life * life;
+      } else if (k === KIND.SPLASH) {
+        shape = SHAPE.DROP; // a tiny bead: highlight plus a dark rim, readable on any background
+        size *= 1.5;
+        a *= life;
       } else if (k === KIND.BEAD) {
         const vx = ps.vx[i];
         const vy = ps.vy[i];
@@ -260,13 +283,17 @@ export class GLRenderer {
         param = 0.32;
         size *= 0.35 + 0.9 * (1 - life);
         a *= life;
-      } else {
-        a *= life; // SPLASH
       }
       n = this.put(n, ps.x[i], ps.y[i], size, shape, angle, param, ps.r[i], g, b, a, dpr);
     }
     const sp = fx.sprites;
     for (let i = 0; i < sp.n; i++) {
+      if (sp.shape[i] === SHAPE.PUFF) continue;
+      n = this.put(n, sp.x[i], sp.y[i], sp.size[i], sp.shape[i], sp.angle[i], sp.param[i], sp.r[i], sp.g[i], sp.b[i], sp.a[i], dpr);
+    }
+    const nAdd = n; // everything above adds up (light); what follows stacks normally
+    for (let i = 0; i < sp.n; i++) {
+      if (sp.shape[i] !== SHAPE.PUFF) continue;
       n = this.put(n, sp.x[i], sp.y[i], sp.size[i], sp.shape[i], sp.angle[i], sp.param[i], sp.r[i], sp.g[i], sp.b[i], sp.a[i], dpr);
     }
     if (outline && outline.present) n = this.outline(outline, dpr, n);
@@ -274,7 +301,8 @@ export class GLRenderer {
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.clear(gl.COLOR_BUFFER_BIT);
     this.drawCalls = 0;
-    if (fx.light.i > 0) this.drawLight(fx.light, dpr);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    if (fx.light.i > 0 || fx.dim > 0) this.drawScene(fx, dpr);
     if (n === 0) return;
     gl.useProgram(this.prog);
     gl.uniform2f(this.uRes, this.canvas.width, this.canvas.height);
@@ -288,8 +316,17 @@ export class GLRenderer {
       off += k === 0 ? 8 : 4;
     }
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.u8.subarray(0, n * STRIDE));
-    gl.drawArrays(gl.POINTS, 0, n);
-    this.drawCalls++;
+    if (nAdd > 0) {
+      // Additive: premultiplied colours stay valid when summed, and overlapping stars burn white.
+      gl.blendFunc(gl.ONE, gl.ONE);
+      gl.drawArrays(gl.POINTS, 0, nAdd);
+      this.drawCalls++;
+    }
+    if (n > nAdd) {
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.POINTS, nAdd, n - nAdd);
+      this.drawCalls++;
+    }
   }
 
   put(n, x, y, size, shape, angle, param, r, g, b, a, dpr) {
@@ -311,8 +348,9 @@ export class GLRenderer {
     return n + 1;
   }
 
-  drawLight(L, dpr) {
+  drawScene(fx, dpr) {
     const gl = this.gl;
+    const L = fx.light;
     gl.useProgram(this.lprog);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lvbo);
     for (let k = 1; k < ATTRS.length; k++) gl.disableVertexAttribArray(k);
@@ -322,6 +360,8 @@ export class GLRenderer {
     gl.uniform1f(this.uRadius, Math.max(this.canvas.width, this.canvas.height) * 0.7);
     gl.uniform3f(this.uColor, L.r / 255, L.g / 255, L.b / 255);
     gl.uniform1f(this.uI, L.i);
+    gl.uniform1f(this.uDim, fx.dim);
+    gl.uniform1f(this.uH, this.canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     this.drawCalls++;
   }

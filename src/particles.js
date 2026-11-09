@@ -211,20 +211,20 @@ export class ParticleSystem {
     const px = p.x + n.x;
     const py = p.y + n.y;
     for (let s = 0; s < 3; s++) {
-      const spread = (Math.random() - 0.5) * 300;
-      const up = 110 + Math.random() * 170;
+      const spread = (Math.random() - 0.5) * 320;
+      const up = 120 + Math.random() * 180;
       this.spawn(
         KIND.SPLASH,
         px,
         py,
         n.x * up - n.y * spread + head.vx * 0.5 + vx * 0.04,
         n.y * up + n.x * spread + head.vy * 0.5 - 50,
-        0.26 + Math.random() * 0.2,
-        2.5 + Math.random() * 2,
-        205,
-        228,
+        0.22 + Math.random() * 0.18,
+        2.5 + Math.random() * 1.5,
+        215,
+        235,
         255,
-        0.85,
+        0.95,
       );
     }
     if (n.y > -0.35) return; // a side hit: no ring, no bead
@@ -232,7 +232,7 @@ export class ParticleSystem {
       // Rings sit a few px into the hair at random depths: on the exact edge they
       // traced the collider ellipse as a dotted arc.
       const sink = 1 + Math.random() * 7;
-      const j = this.spawn(KIND.RING, px - n.x * sink, py - n.y * sink, head.vx, head.vy, 0.24, 10 + Math.random() * 5, 215, 235, 255, 0.45);
+      const j = this.spawn(KIND.RING, px - n.x * sink, py - n.y * sink, head.vx, head.vy, 0.26, 12 + Math.random() * 6, 220, 238, 255, 0.5);
       if (j >= 0) this.aux[j] = Math.atan2(n.x, -n.y); // lies along the surface tangent
     }
     if (this.beads < phys.maxBeads && Math.random() < phys.beadChance) {

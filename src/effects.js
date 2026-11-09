@@ -101,6 +101,11 @@ export class Effects {
     this.flashes = 0;
     // Scene light from the latest bursts, drawn by the renderer as a soft wash.
     this.light = { x: 0, y: 0, r: 255, g: 255, b: 255, i: 0 };
+    // While fireworks run the picture dims, most at the top where shells break,
+    // so the bursts stand out on a bright camera image. It moves slowly enough
+    // that no dim/undim pair reaches the 10% luminance change of a WCAG flash.
+    this.dim = 0;
+    this.lastBurstAt = -1e9;
 
     this._top = { x: 0, y: 0 };
     this._t = { x: 0, y: 0 };
@@ -149,6 +154,10 @@ export class Effects {
     const L = this.light;
     L.i *= Math.exp(-dt / f.light.tauS);
     if (L.i < 0.002) L.i = 0;
+    const D = f.dim;
+    const dimWant = laughing || this.rN > 0 || nowMs - this.lastBurstAt < D.holdMs ? D.max : 0;
+    this.dim += (dimWant - this.dim) * (1 - Math.exp(-dt / (dimWant > this.dim ? D.inTauS : D.outTauS)));
+    if (dimWant === 0 && this.dim < 0.002) this.dim = 0;
 
     // Fireworks: keep shells coming while the laugh lasts; bigger laugh, faster cadence.
     if (laughing) {
@@ -257,17 +266,17 @@ export class Effects {
         c.vx * 0.3 + this.wind * 0.15 + rand(-12, 12),
         rand(v0, v1) * 0.6,
         3,
-        rand(16, 24),
-        200,
-        224,
+        rand(20, 30),
+        215,
+        232,
         255,
-        rand(0.6, 0.85),
+        rand(0.75, 0.95),
       );
       if (i < 0) {
         this.cloudAcc = 0;
         break;
       }
-      ps.aux[i] = 1.25; // streak width, CSS px
+      ps.aux[i] = 1.5; // streak width, CSS px
     }
   }
 
@@ -291,17 +300,17 @@ export class Effects {
         vx,
         vy,
         3,
-        far ? rand(10, 16) : rand(20, 30),
-        190,
-        215,
+        far ? rand(12, 18) : rand(22, 32),
+        200,
+        222,
         255,
-        far ? rand(0.22, 0.34) : rand(0.4, 0.6),
+        far ? rand(0.3, 0.45) : rand(0.5, 0.7),
       );
       if (i < 0) {
         this.screenAcc = 0;
         break;
       }
-      ps.aux[i] = far ? 0.75 : 1.1;
+      ps.aux[i] = far ? 0.9 : 1.3;
     }
   }
 
@@ -454,6 +463,7 @@ export class Effects {
     this.lastBurst.x = x;
     this.lastBurst.y = y;
     this.lastBurst.shell = shell;
+    this.lastBurstAt = this.now;
     const scale = clamp(minSide / 700, 0.65, 1.4);
     const vmax = rand(f.speed[0], f.speed[1]) * scale;
     const pal = shell === SHELL.WILLOW ? GOLD : shell === SHELL.HEART ? LOVE : PALETTES[this.paletteIx++ % PALETTES.length];

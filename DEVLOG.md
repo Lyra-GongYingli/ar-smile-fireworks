@@ -31,7 +31,7 @@
 ## 验收方式
 
 ```bash
-npm test   # 59 个单测
+npm test   # 60 个单测
 ```
 
 浏览器验收用 Chrome 无头模式加 `--use-angle=metal`（真 GPU）和 `--use-file-for-fake-video-capture`（把一段人脸视频当摄像头），逐秒读取 `window.__app.snapshot`：帧率、每帧 JS 耗时、推理耗时、检测频率、粒子数、头部碰撞次数。手机场景用 390×844 视口加 CPU 降速 4 倍近似。测试视频不入库。

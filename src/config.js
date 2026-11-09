@@ -96,13 +96,16 @@ export const CONFIG = {
     finaleAfterMs: 2600, // laughing this long: golden willows over the head
     maxFlashesPerSec: 3, // WCAG 2.3.1
     light: { max: 0.085, add: 0.05, tauS: 0.22 }, // scene glow; < 10% luminance change is not a "flash"
+    // Scene dims while fireworks run (top edge; 45% of it at the bottom). With a
+    // 0.5 s time constant it moves < 10% in any 1/3 s, so it can never flash.
+    dim: { max: 0.18, inTauS: 0.5, outTauS: 0.9, holdMs: 1500 },
   },
 
   // Quality tiers. The governor moves between them based on measured frame time.
   tiers: [
-    { name: 'low', maxParticles: 1200, rainPer1000px: 120, cloudDrops: 70, sparksPerBurst: 60, trailRate: 4, dprCap: 1.25 },
-    { name: 'mid', maxParticles: 2600, rainPer1000px: 200, cloudDrops: 110, sparksPerBurst: 100, trailRate: 8, dprCap: 1.75 },
-    { name: 'high', maxParticles: 5000, rainPer1000px: 280, cloudDrops: 150, sparksPerBurst: 150, trailRate: 12, dprCap: 2 },
+    { name: 'low', maxParticles: 1200, rainPer1000px: 120, cloudDrops: 110, sparksPerBurst: 60, trailRate: 4, dprCap: 1.25 },
+    { name: 'mid', maxParticles: 2600, rainPer1000px: 200, cloudDrops: 170, sparksPerBurst: 100, trailRate: 8, dprCap: 1.75 },
+    { name: 'high', maxParticles: 5000, rainPer1000px: 280, cloudDrops: 230, sparksPerBurst: 150, trailRate: 12, dprCap: 2 },
   ],
   governor: {
     downAfterMs: 1500, // frame interval above budget for this long -> drop a tier

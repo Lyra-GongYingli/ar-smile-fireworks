@@ -197,3 +197,29 @@ test('the cloud shrinks to fit the GPU point-size cap instead of being clipped',
   for (const i of puffs(fx)) biggest = Math.max(biggest, fx.sprites.size[i]);
   assert.ok(biggest <= 120, `puff ${biggest.toFixed(1)} px > cap`);
 });
+
+test('fireworks dim the picture, slowly enough never to flash, and it recovers after', () => {
+  const { ps, fx } = setup();
+  const h = head();
+  const D = CONFIG.fireworks.dim;
+  const trace = [];
+  // worst case: a laugh that switches on and off every 380 ms (the release time)
+  let t = 0;
+  for (; t < 4000; t += 1000 / 60) {
+    const laughing = Math.floor(t / 380) % 2 === 0;
+    fx.update(1 / 60, t, 0, laughing ? 0.4 : 0, laughing, h, W, H);
+    ps.step(1 / 60, h, W, H, CONFIG.physics);
+    trace.push([t, fx.dim]);
+    assert.ok(fx.dim <= D.max + 1e-9);
+  }
+  // no change of 10% or more within any third of a second
+  for (let i = 0; i < trace.length; i++) {
+    for (let j = i + 1; j < trace.length && trace[j][0] - trace[i][0] <= 1000 / 3; j++) {
+      assert.ok(Math.abs(trace[j][1] - trace[i][1]) < 0.1, `dim moved ${(trace[j][1] - trace[i][1]).toFixed(3)} in ${(trace[j][0] - trace[i][0]).toFixed(0)} ms`);
+    }
+  }
+  assert.ok(Math.max(...trace.map((r) => r[1])) > D.max * 0.6, 'it does dim');
+  // after the last burst it comes back to the plain picture
+  t = run(ps, fx, h, 5000, { laughing: false }, t);
+  assert.equal(fx.dim, 0);
+});
