@@ -269,6 +269,7 @@ function resize() {
   H = Math.max(1, r.height);
   dpr = Math.min(window.devicePixelRatio || 1, tier.dprCap);
   renderer.resize(Math.round(W * dpr), Math.round(H * dpr));
+  effects.maxSprite = renderer.maxPoint ? renderer.maxPoint / dpr : Infinity;
   updateXform();
 }
 
@@ -320,7 +321,7 @@ function loop(now) {
   effects.update(dt, now, expr.rainLevel(), expr.laughLevel(), laughing, collider, W, H);
   const steps = dt > 1 / 55 ? 2 : 1;
   for (let s = 0; s < steps; s++) ps.step(dt / steps, collider, W, H, CONFIG.physics);
-  renderer.draw(ps, dpr, hud.visible ? collider : null);
+  renderer.draw(ps, effects, dpr, hud.visible ? collider : null);
 
   const workMs = performance.now() - t0;
   governor(now, intervalMs, workMs);

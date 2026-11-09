@@ -1,6 +1,6 @@
 const ZH = {
   title: '笑一笑，下场雨；笑出声，放烟花',
-  lead: '微笑时屏幕下雨，大笑时烟花在头顶炸开，火花落到头上会弹开。晃头可以把火花甩走。',
+  lead: '微笑时头顶飘来一朵云下雨，笑得越开雨越大；大笑时云被吹散、烟花升空，火花落到头上会弹开。晃头能甩掉水珠和火花。',
   start: '开启摄像头',
   demo: '没有摄像头？看演示',
   privacy: '画面只在你的设备上计算，不会上传。',
@@ -50,7 +50,7 @@ const ZH = {
 
 const EN = {
   title: 'Smile for rain, laugh for fireworks',
-  lead: 'Smile and it rains. Laugh and fireworks burst above your head; the sparks bounce off it. Shake your head to knock them away.',
+  lead: 'Smile and a cloud rains on you: the bigger the smile, the harder it rains. Laugh and the cloud blows away as fireworks go up; the sparks bounce off your head. Shake your head to fling them off.',
   start: 'Turn on camera',
   demo: 'No camera? Watch the demo',
   privacy: 'Video is processed on your device and never uploaded.',

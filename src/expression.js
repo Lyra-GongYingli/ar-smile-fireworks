@@ -165,11 +165,10 @@ export class ExpressionMachine {
     return EXPR_NAME[state];
   }
 
-  /** 0..1 rain intensity: grows with the smile, ducks under fireworks. */
+  /** 0..1 rain intensity: grows with the smile. 0 while laughing: the fireworks take over. */
   rainLevel() {
     const c = this.cfg;
     if (this.state === EXPR.SMILE) return 0.35 + 0.65 * clamp01((this.smile - c.smileOff) / (0.9 - c.smileOff));
-    if (this.state === EXPR.LAUGH) return 0.3;
     return 0;
   }
 
