@@ -83,6 +83,18 @@
       <button id="btn-err-demo" class="btn ghost" data-t="demo">没有摄像头？看演示</button>
     </section>
 
+    <!-- ?calibrate=1: guided expressions, records blendshape numbers only -->
+    <section id="calib" class="calib" hidden>
+      <div id="calib-meta" class="muted small"></div>
+      <div id="calib-text" class="calib-text"></div>
+      <div class="progress" aria-hidden="true"><div id="calib-bar"></div></div>
+      <div id="calib-result" hidden></div>
+      <div id="calib-actions" hidden>
+        <button id="btn-calib-again" class="btn ghost" data-t="calibAgain">再测一次</button>
+        <button id="btn-calib-copy" class="btn ghost" data-t="calibCopy">复制数据</button>
+      </div>
+    </section>
+
     <div id="demo-pad">
       <button class="btn hold" data-hold="smile" data-t="holdSmile">按住：微笑</button>
       <button class="btn hold" data-hold="laugh" data-t="holdLaugh">按住：大笑</button>

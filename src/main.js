@@ -9,6 +9,7 @@ import { Canvas2DRenderer } from './renderer-2d.js';
 import { Hud } from './hud.js';
 import { DemoInput } from './demo.js';
 import { Governor } from './governor.js';
+import { Calibration, PHASES, PHASE_LABEL } from './calibrate.js';
 import { FaceTracker, preloadAssets } from './tracker.js';
 import { CameraError, inAppBrowser, openCamera, openTestSource, stopStream } from './camera.js';
 
@@ -55,6 +56,9 @@ const timings = {};
 let loadText = '';
 let chipText = '';
 let chipCheck = 0;
+const calib = params.get('calibrate') === '1' ? new Calibration(LANG) : null;
+let calibFaceSince = -1;
+let calibKey = '';
 // Every mutable module variable is declared above this line. Code below runs
 // during module evaluation (URL switches, the capability error path), so a `let`
 // declared further down would still be in its temporal dead zone when called.
@@ -125,6 +129,21 @@ $('#btn-demo').addEventListener('click', startDemo);
 $('#btn-retry').addEventListener('click', startCamera);
 $('#btn-err-demo').addEventListener('click', startDemo);
 $('#btn-hud').addEventListener('click', () => hud.setVisible(!hud.visible));
+$('#btn-calib-again').addEventListener('click', () => {
+  calib.reset();
+  calibFaceSince = -1;
+  calibKey = '';
+  $('#calib-result').hidden = true;
+  $('#calib-actions').hidden = true;
+});
+$('#btn-calib-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(window.__calib));
+    $('#btn-calib-copy').textContent = T.calibCopied;
+  } catch {
+    $('#btn-calib-copy').textContent = T.calibCopyFailed;
+  }
+});
 // Handlers are attached: the buttons may work now (they ship disabled in the HTML).
 $('#btn-demo').disabled = false;
 $('#btn-start').disabled = !!capErr;
@@ -151,6 +170,10 @@ async function startCamera() {
   mode = 'camera';
   updateXform();
   startLoop();
+  if (calib) {
+    hud.setVisible(true);
+    $('#calib').hidden = false;
+  }
   try {
     await trkP;
   } catch (e) {
@@ -258,6 +281,7 @@ function loop(now) {
       if (tracker.failed) onTrackerFailure();
     }
     head.sample(now, collider);
+    if (calib) calibFrame(now);
   } else if (mode === 'demo') {
     demoFrame(dt, now);
   } else {
@@ -284,6 +308,7 @@ function onDetection(res, now) {
     head.lost(now);
     noFaceMs += dtMs;
     expr.update(dtMs, null, 0);
+    if (calib) calib.record(now, null, 0, expr);
     return;
   }
   noFaceMs = 0;
@@ -307,6 +332,7 @@ function onDetection(res, now) {
   sig.funnel = bsScores[bsIdx.mouthFunnel];
   sig.pucker = bsScores[bsIdx.mouthPucker];
   onExpr(expr.update(dtMs, sig, yaw), now);
+  if (calib) calib.record(now, sig, yaw, expr);
 }
 
 function onExpr(ev, now) {
@@ -354,6 +380,62 @@ function demoFrame(dt, now) {
   yaw = 0;
   onExpr(expr.update(dt * 1000, demo.sig, 0), now);
   demo.render(EXPR_NAME[expr.state]);
+}
+
+// ---------------------------------------------------------------- calibration
+function calibFrame(now) {
+  if (calib.state === 'idle') {
+    // Start once a face has been seen steadily for a second.
+    if (tracker && head.present) {
+      if (calibFaceSince < 0) calibFaceSince = now;
+      if (now - calibFaceSince > 1000) calib.begin(now);
+    } else calibFaceSince = -1;
+    return calibShow('wait', T.calibWait, '', 0);
+  }
+  if (calib.state !== 'running') return;
+  const ui = calib.tick(now);
+  if (ui.done) return calibResults();
+  const step = `${ui.step}/${ui.total}`;
+  const note = ui.recording ? '' : T.calibGetReady(ui.countdown);
+  calibShow(`${ui.step}-${ui.recording}-${ui.countdown}`, ui.text, `${step}${note ? ' · ' + note : ''}`, ui.progress);
+}
+
+function calibShow(key, text, meta, progress) {
+  $('#calib-bar').style.transform = `scaleX(${progress})`;
+  if (key === calibKey) return;
+  calibKey = key;
+  $('#calib-text').textContent = text;
+  $('#calib-meta').textContent = meta;
+}
+
+function calibResults() {
+  const summary = calib.summary();
+  const zh = LANG === 'zh';
+  window.__calib = { at: new Date().toISOString(), thresholds: { ...CONFIG.expr }, summary, frames: calib.frames };
+  const fmt = (a) => (Number.isNaN(a[1]) ? '—' : `${a[1].toFixed(2)} (${a[0].toFixed(2)}–${a[2].toFixed(2)})`);
+  const rows = summary.map((s) => [
+    PHASE_LABEL[s.phase][zh ? 0 : 1],
+    fmt(s.smile),
+    fmt(s.jaw),
+    `${Math.round(s.states.none * 100)} / ${Math.round(s.states.smile * 100)} / ${Math.round(s.states.laugh * 100)}`,
+    `${Math.round(s.hit * 100)}%`,
+  ]);
+  const table = document.createElement('table');
+  const headRow = zh ? ['动作', '嘴角 中位(10–90%)', '张嘴 中位(10–90%)', '无/微笑/大笑 %', '判对'] : ['Phase', 'Smile p50 (p10–p90)', 'Jaw p50 (p10–p90)', 'None/Smile/Laugh %', 'Correct'];
+  for (const cells of [headRow, ...rows]) {
+    const tr = document.createElement('tr');
+    for (const c of cells) {
+      const td = document.createElement(cells === headRow ? 'th' : 'td');
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  const box = $('#calib-result');
+  box.replaceChildren(table);
+  box.hidden = false;
+  $('#calib-actions').hidden = false;
+  calibShow('done', T.calibDone, `${PHASES.length}/${PHASES.length}`, 1);
 }
 
 // ---------------------------------------------------------------- governor

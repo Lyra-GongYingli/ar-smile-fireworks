@@ -244,6 +244,57 @@ body[data-mode='demo'] #demo-pad {
   border-color: var(--cyan);
 }
 
+/* ---------- calibration (?calibrate=1) ---------- */
+.calib {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: 60dvh;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(10, 12, 18, 0.78);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.calib[hidden] {
+  display: none;
+}
+.calib-text {
+  margin: 4px 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+}
+#calib-bar {
+  height: 100%;
+  background: var(--cyan);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+#calib-result table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+#calib-result th,
+#calib-result td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+#calib-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+#calib-actions .btn {
+  margin: 0;
+}
+
 /* ---------- HUD ---------- */
 #hud {
   position: fixed;
